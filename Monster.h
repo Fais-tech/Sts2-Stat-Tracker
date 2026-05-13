@@ -1,5 +1,5 @@
-#ifndef monster_h
-#define monster_h
+#ifndef MONSTER_H
+#define MONSTER_H
 
 #include <string>
 #include <unordered_map>

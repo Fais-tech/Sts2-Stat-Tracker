@@ -1,5 +1,5 @@
-#ifndef cards_h
-#define cards_h
+#ifndef CARDS_H
+#define CARDS_H
 
 #include <string>
 #include <vector>

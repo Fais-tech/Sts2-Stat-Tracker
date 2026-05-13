@@ -1,0 +1,7 @@
+# Compiled binary
+a.out
+*.exe
+*.o
+
+# Run history data files
+history/

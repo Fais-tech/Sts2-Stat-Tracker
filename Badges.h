@@ -1,5 +1,5 @@
-#ifndef badges_h
-#define badges_h
+#ifndef BADGES_H
+#define BADGES_H
 
 #include <string>
 #include <unordered_map>

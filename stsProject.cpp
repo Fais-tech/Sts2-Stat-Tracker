@@ -36,11 +36,12 @@ string formatName(const string& name)
     return result;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    string historyPath = (argc > 1) ? argv[1] : "history";
     int filesProcessed = 0;
 
-    for (auto& entry : fs::directory_iterator("history"))
+    for (auto& entry : fs::directory_iterator(historyPath))
     {
         if (entry.path().extension() != ".run") continue;
 
@@ -56,7 +57,7 @@ int main()
         catch (...) { cout << "Failed to parse: " << entry.path() << endl; continue; }
 
         filesProcessed++;
-        cout << "Processing: " << entry.path().filename().string() << endl;
+        // cout << "Processing: " << entry.path().filename().string() << endl;
 
         bool runWon       = run["win"];
         bool runAbandoned = run["was_abandoned"];

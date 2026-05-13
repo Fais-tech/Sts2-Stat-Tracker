@@ -1,5 +1,5 @@
-#ifndef relics_h
-#define relics_h
+#ifndef RELICS_H
+#define RELICS_H
 
 #include <string>
 #include <unordered_map>

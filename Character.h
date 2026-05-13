@@ -1,5 +1,5 @@
-#ifndef character_h
-#define character_h
+#ifndef CHARACTER_H
+#define CHARACTER_H
 
 #include <string>
 #include <unordered_map>
