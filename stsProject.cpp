@@ -41,6 +41,8 @@ int main(int argc, char* argv[])
     string historyPath = (argc > 1) ? argv[1] : "history";
     int filesProcessed = 0;
 
+    cout << "Parsing run files..." << endl;
+
     for (auto& entry : fs::directory_iterator(historyPath))
     {
         if (entry.path().extension() != ".run") continue;
