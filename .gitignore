@@ -5,3 +5,6 @@ a.out
 
 # Run history data files
 history/
+
+# Generated CSV output
+output/

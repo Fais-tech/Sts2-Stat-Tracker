@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
     string historyPath = (argc > 1) ? argv[1] : "history";
     int filesProcessed = 0;
 
-    cout << "Parsing run files..." << endl;
+    cout << "Parsing run files...\n";
 
     for (auto& entry : fs::directory_iterator(historyPath))
     {
@@ -50,16 +50,16 @@ int main(int argc, char* argv[])
         ifstream data(entry.path());
         if (!data.is_open())
         {
-            cout << "Could not open: " << entry.path() << endl;
+            cout << "Could not open: " << entry.path() << "\n";
             continue;
         }
 
         nlohmann::json run;
         try { run = nlohmann::json::parse(data); }
-        catch (...) { cout << "Failed to parse: " << entry.path() << endl; continue; }
+        catch (...) { cout << "Failed to parse: " << entry.path() << "\n"; continue; }
 
         filesProcessed++;
-        // cout << "Processing: " << entry.path().filename().string() << endl;
+        // cout << "Processing: " << entry.path().filename().string() << "\n";
 
         bool runWon       = run["win"];
         bool runAbandoned = run["was_abandoned"];
@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            cout << "UNMATCHED CHARACTER: " << charName << endl;
+            cout << "UNMATCHED CHARACTER: " << charName << "\n";
         }
 
         for (auto& player : run["players"])
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
                 }
                 else
                 {
-                    cout << "UNMATCHED BADGE: " << badgeName << endl;
+                    cout << "UNMATCHED BADGE: " << badgeName << "\n";
                 }
             }
         }
@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
                             }
                             else
                             {
-                                cout << "UNMATCHED CARD: " << cardName << endl;
+                                cout << "UNMATCHED CARD: " << cardName << "\n";
                             }
                         }
                     }
@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
                             }
                             else
                             {
-                                cout << "UNMATCHED RELIC: " << relicName << endl;
+                                cout << "UNMATCHED RELIC: " << relicName << "\n";
                             }
                         }
                     }
@@ -203,7 +203,7 @@ int main(int argc, char* argv[])
                             if (relicMap.count(relicName))
                                 relicMap[relicName].timesSeen++;
                             else
-                                cout << "UNMATCHED RELIC (ancient): " << relicName << endl;
+                                cout << "UNMATCHED RELIC (ancient): " << relicName << "\n";
                         }
                     }
                 }
@@ -229,7 +229,7 @@ int main(int argc, char* argv[])
                     }
                     else
                     {
-                        cout << "UNMATCHED ENCOUNTER: " << encounterId << endl;
+                        cout << "UNMATCHED ENCOUNTER: " << encounterId << "\n";
                     }
 
                     for (auto& playerStat : mapPoint["player_stats"])
@@ -254,7 +254,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    cout << "\nProcessed " << filesProcessed << " run file(s)." << endl;
+    cout << "\nProcessed " << filesProcessed << " run file(s)." << "\n";
 
     // ------------------------------------------------
     // Character Statistics
@@ -296,7 +296,7 @@ int main(int argc, char* argv[])
 
     size_t overallLabelLen = max(maxCharLen, string("Overall").size());
 
-    cout << "\n========== Character Statistics ==========" << endl;
+    cout << "\n========== Character Statistics ==========" << "\n";
     for (auto& [name, stats] : playedCharacters)
     {
         cout << "  " << left << setw(overallLabelLen) << formatName(name) << right
@@ -304,14 +304,14 @@ int main(int argc, char* argv[])
              << " | Wins: "      << setw(3) << stats->wins
              << " | Win Rate: "  << setw(6) << stats->getWinRate() << "%"
              << " | Abandoned: " << setw(3) << stats->abandoned
-             << endl;
+             << "\n";
     }
     cout << "\n  " << left << setw(overallLabelLen) << "Overall" << right
          << " | Runs: "      << setw(3) << totalRuns
          << " | Wins: "      << setw(3) << totalWins
          << " | Win Rate: "  << setw(6) << overallWinRate << "%"
          << " | Abandoned: " << setw(3) << totalAbandoned
-         << endl;
+         << "\n";
 
     // ------------------------------------------------
     // Badge Statistics
@@ -330,7 +330,7 @@ int main(int argc, char* argv[])
     for (auto& [name, _] : earnedBadges)
         maxBadgeLen = max(maxBadgeLen, formatName(name).size());
 
-    cout << "\n========== Badge Statistics ==========" << endl;
+    cout << "\n========== Badge Statistics ==========" << "\n";
     for (auto& [name, stats] : earnedBadges)
     {
         cout << "  " << left << setw(maxBadgeLen) << formatName(name) << right
@@ -338,7 +338,7 @@ int main(int argc, char* argv[])
              << " | Bronze: " << setw(3) << stats->bronze
              << " | Silver: " << setw(3) << stats->silver
              << " | Gold: "   << setw(3) << stats->gold
-             << endl;
+             << "\n";
     }
 
     // ------------------------------------------------
@@ -372,13 +372,13 @@ int main(int argc, char* argv[])
         maxRelicLen = max(maxRelicLen, formatName(name).size());
 
     string currentRelicRarity = "NONE";
-    cout << "\n========== Relic Statistics ==========" << endl;
+    cout << "\n========== Relic Statistics ==========" << "\n";
     for (auto& [name, stats] : seenRelics)
     {
         if (stats->relicRarity != currentRelicRarity)
         {
             currentRelicRarity = stats->relicRarity;
-            cout << "\n  -- " << formatName(currentRelicRarity) << " --" << endl;
+            cout << "\n  -- " << formatName(currentRelicRarity) << " --" << "\n";
         }
         cout << "  " << left << setw(maxRelicLen) << formatName(name) << right
              << " | Pick Rate: " << setw(6) << stats->getPickRate() << "%"
@@ -386,7 +386,7 @@ int main(int argc, char* argv[])
              << "/"              << setw(3) << stats->timesSeen
              << " | Win Rate: "  << setw(6) << stats->getWinRate() << "%"
              << " | Wins: "      << setw(3) << stats->timesWon
-             << endl;
+             << "\n";
     }
 
     // ------------------------------------------------
@@ -439,25 +439,25 @@ int main(int argc, char* argv[])
 
     string currentClass = "NONE";
     string currentRarity = "NONE";
-    cout << "\n========== Card Statistics ==========" << endl;
+    cout << "\n========== Card Statistics ==========" << "\n";
     for (auto& [name, stats] : seenCards)
     {
         if (stats->cardClass != currentClass)
         {
             currentClass = stats->cardClass;
             currentRarity = "NONE";
-            cout << "\n=== " << formatName(currentClass) << " ===" << endl;
+            cout << "\n=== " << formatName(currentClass) << " ===" << "\n";
         }
         if (stats->cardRarity != currentRarity)
         {
             currentRarity = stats->cardRarity;
-            cout << "\n  -- " << formatName(currentRarity) << " --" << endl;
+            cout << "\n  -- " << formatName(currentRarity) << " --" << "\n";
         }
         if (stats->cardRarity == "curse" || stats->cardRarity == "quest")
         {
             cout << "  " << left << setw(maxCardLen) << formatName(name) << right
                  << " | Received: " << setw(3) << stats->timesSeen
-                 << " | Wins: "     << setw(3) << stats->timesWon << endl;
+                 << " | Wins: "     << setw(3) << stats->timesWon << "\n";
         }
         else
         {
@@ -466,7 +466,7 @@ int main(int argc, char* argv[])
                  << " | Picked: "    << setw(3) << stats->timesPicked
                  << "/"              << setw(3) << stats->timesSeen
                  << " | Win Rate: "  << setw(6) << stats->getWinRate() << "%"
-                 << " | Wins: "      << setw(3) << stats->timesWon << endl;
+                 << " | Wins: "      << setw(3) << stats->timesWon << "\n";
         }
     }
 
@@ -503,27 +503,86 @@ int main(int argc, char* argv[])
 
     string currentAct = "NONE";
     string currentDifficulty = "NONE";
-    cout << "\n========== Monster Statistics ==========" << endl;
+    cout << "\n========== Monster Statistics ==========" << "\n";
     for (auto& [name, stats] : seenMonsters)
     {
         if (stats->act != currentAct)
         {
             currentAct = stats->act;
             currentDifficulty = "NONE";
-            cout << "\n=== " << formatName(currentAct) << " ===" << endl;
+            cout << "\n=== " << formatName(currentAct) << " ===" << "\n";
         }
         if (stats->difficulty != currentDifficulty)
         {
             currentDifficulty = stats->difficulty;
-            cout << "\n  -- " << formatName(currentDifficulty) << " --" << endl;
+            cout << "\n  -- " << formatName(currentDifficulty) << " --" << "\n";
         }
         cout << "  " << left << setw(maxMonsterLen) << formatName(name) << right
              << " | Seen: "          << setw(3) << stats->timesSeen
              << " | Avg Damage: "    << setw(6) << stats->getAverageDamage()
              << " | Avg Turns: "     << setw(5) << stats->getAverageTurns()
              << " | Killed Player: " << setw(3) << stats->timesKilledPlayer
-             << endl;
+             << "\n";
     }
+
+    // ------------------------------------------------
+    // CSV Output
+    // ------------------------------------------------
+    fs::create_directories("output");
+
+    {
+        ofstream csv("output/characters.csv");
+        csv << "Character,Runs,Wins,Win Rate,Abandoned\n";
+        for (auto& [name, stats] : playedCharacters)
+            csv << formatName(name) << "," << stats->totalRuns << "," << stats->wins << ","
+                << fixed << setprecision(2) << stats->getWinRate() << "," << stats->abandoned << "\n";
+        csv << "Overall," << totalRuns << "," << totalWins << ","
+            << fixed << setprecision(2) << overallWinRate << "," << totalAbandoned << "\n";
+    }
+
+    {
+        ofstream csv("output/badges.csv");
+        csv << "Badge,Total,Bronze,Silver,Gold\n";
+        for (auto& [name, stats] : earnedBadges)
+            csv << formatName(name) << "," << stats->total() << "," << stats->bronze << ","
+                << stats->silver << "," << stats->gold << "\n";
+    }
+
+    {
+        ofstream csv("output/relics.csv");
+        csv << "Relic,Rarity,Times Seen,Times Picked,Pick Rate,Wins,Win Rate\n";
+        for (auto& [name, stats] : seenRelics)
+            csv << formatName(name) << "," << stats->relicRarity << "," << stats->timesSeen << ","
+                << stats->timesPicked << "," << fixed << setprecision(2) << stats->getPickRate() << ","
+                << stats->timesWon << "," << stats->getWinRate() << "\n";
+    }
+
+    {
+        ofstream csv("output/cards.csv");
+        csv << "Card,Class,Rarity,Times Seen,Times Picked,Pick Rate,Wins,Win Rate\n";
+        for (auto& [name, stats] : seenCards)
+        {
+            if (stats->cardRarity == "curse" || stats->cardRarity == "quest")
+                csv << formatName(name) << "," << stats->cardClass << "," << stats->cardRarity << ","
+                    << stats->timesSeen << ",,,," << stats->timesWon << "\n";
+            else
+                csv << formatName(name) << "," << stats->cardClass << "," << stats->cardRarity << ","
+                    << stats->timesSeen << "," << stats->timesPicked << ","
+                    << fixed << setprecision(2) << stats->getPickRate() << ","
+                    << stats->timesWon << "," << stats->getWinRate() << "\n";
+        }
+    }
+
+    {
+        ofstream csv("output/encounters.csv");
+        csv << "Encounter,Act,Difficulty,Times Seen,Avg Damage,Avg Turns,Times Killed Player\n";
+        for (auto& [name, stats] : seenMonsters)
+            csv << formatName(name) << "," << stats->act << "," << stats->difficulty << ","
+                << stats->timesSeen << "," << fixed << setprecision(2) << stats->getAverageDamage() << ","
+                << stats->getAverageTurns() << "," << stats->timesKilledPlayer << "\n";
+    }
+
+    cout << "\nCSV files written to output/" << "\n";
 
     return 0;
 }
