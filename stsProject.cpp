@@ -36,12 +36,46 @@ string formatName(const string& name)
     return result;
 }
 
+string stripId(const string& raw)
+{
+    if (raw == "NONE.NONE") return "";
+    string result = raw.substr(raw.find('.') + 1);
+    transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
 int main(int argc, char* argv[])
 {
     string historyPath = (argc > 1) ? argv[1] : "history";
     int filesProcessed = 0;
 
     cout << "Parsing run files...\n";
+
+    fs::create_directories("output/raw");
+    ofstream runsCsv("output/raw/runs.csv");
+    runsCsv << "run_id,character_name,ascension,won_run,abandoned_run,run_time,killed_by_encounter,killed_by_event\n";
+
+    ofstream floorsCsv("output/raw/floors.csv");
+    floorsCsv << "run_id,floor_number,act_number,room_type,damage_taken,hp_healed,current_hp,max_hp_gained,gold_difference\n";
+
+    ofstream combatsCsv("output/raw/combats.csv");
+    combatsCsv << "run_id,floor_number,encounter_name,turns_taken\n";
+
+    ofstream cardChoicesCsv("output/raw/card_choices.csv");
+    cardChoicesCsv << "run_id,floor_number,card_name,was_picked\n";
+
+    ofstream relicChoicesCsv("output/raw/relic_choices.csv");
+    relicChoicesCsv << "run_id,floor_number,relic_name,was_picked\n";
+
+    ofstream badgesCsv("output/raw/badges_earned.csv");
+    badgesCsv << "run_id,badge_name,rarity\n";
+
+    if (!runsCsv || !floorsCsv || !combatsCsv || !cardChoicesCsv ||
+        !relicChoicesCsv || !badgesCsv)
+    {
+        cerr << "Could not open one or more output/raw CSV files.\n";
+        return 1;
+    }
 
     for (auto& entry : fs::directory_iterator(historyPath))
     {
@@ -67,6 +101,33 @@ int main(int argc, char* argv[])
         string charId = run["players"][0]["character"];
         string charName = charId.substr(10);
         transform(charName.begin(), charName.end(), charName.begin(), ::tolower);
+
+        string runIdStr = entry.path().stem().string();   // "1772742347"
+        if (!all_of(runIdStr.begin(), runIdStr.end(), ::isdigit))
+        {
+            cout << "ERROR: Invalid run ID: " << runIdStr << " in file: " << entry.path() << "\n";
+            continue;
+        }
+
+        runsCsv << runIdStr << ","
+        << charName << ","
+        << run["ascension"].get<int>() << ","
+        << (runWon ? "true" : "false") << ","
+        << (runAbandoned ? "true" : "false") << ","
+        << run["run_time"].get<int>() << ","
+        << stripId(run["killed_by_encounter"]) << ","
+        << stripId(run["killed_by_event"]) << "\n";
+
+        if (run["players"][0].contains("badges"))
+        {
+            for (auto& badge : run["players"][0]["badges"])
+            {
+                string badgeName = badge["id"];
+                transform(badgeName.begin(), badgeName.end(), badgeName.begin(), ::tolower);
+                if (badgeMap.count(badgeName))
+                    badgesCsv << runIdStr << "," << badgeName << "," << badge["rarity"].get<string>() << "\n";
+            }
+        }
 
         if (characterMap.count(charName))
         {
@@ -102,20 +163,45 @@ int main(int argc, char* argv[])
             }
         }
 
+        int floorNumber = 0;
+        int actNumber = 0;
         for (auto& act : run["map_point_history"])
         {
+            ++actNumber;
             for (auto& mapPoint : act)
             {
+                ++floorNumber;
+
+                const auto& floorPlayerStats = mapPoint["player_stats"];
+                const nlohmann::json emptyPlayerStat = nlohmann::json::object();
+                const auto& floorStats =
+                    floorPlayerStats.is_array() && !floorPlayerStats.empty()
+                        ? floorPlayerStats[0]
+                        : emptyPlayerStat;
+                int goldDifference = floorStats.value("gold_gained", 0)
+                    - floorStats.value("gold_spent", 0)
+                    - floorStats.value("gold_lost", 0)
+                    - floorStats.value("gold_stolen", 0);
+                floorsCsv << runIdStr << ","
+                    << floorNumber << ","
+                    << actNumber << ","
+                    << mapPoint.value("map_point_type", string()) << ","
+                    << floorStats.value("damage_taken", 0) << ","
+                    << floorStats.value("hp_healed", 0) << ","
+                    << floorStats.value("current_hp", 0) << ","
+                    << floorStats.value("max_hp_gained", 0) << ","
+                    << goldDifference << "\n";
+
                 // Parse card choices
-                for (auto& playerStat : mapPoint["player_stats"])
+                auto& playerStats = mapPoint["player_stats"];
+                for (size_t playerIndex = 0; playerIndex < playerStats.size(); ++playerIndex)
                 {
+                    auto& playerStat = playerStats[playerIndex];
                     if (playerStat.contains("card_choices"))
                     {
                         for (auto& choice : playerStat["card_choices"])
                         {
-                            string cardId = choice["card"]["id"];
-                            string cardName = cardId.substr(5);
-                            transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
+                            string cardName = stripId(choice["card"]["id"]);
 
                             bool wasPicked = choice["was_picked"];
 
@@ -125,6 +211,10 @@ int main(int argc, char* argv[])
                             }
                             else if (cardMap.count(cardName))
                             {
+                                if (playerIndex == 0)
+                                    cardChoicesCsv << runIdStr << "," << floorNumber << ","
+                                        << cardName << "," << (wasPicked ? "true" : "false") << "\n";
+
                                 cardMap[cardName].timesSeen++;
                                 if (wasPicked)
                                 {
@@ -144,9 +234,7 @@ int main(int argc, char* argv[])
                     {
                         for (auto& gained : playerStat["cards_gained"])
                         {
-                            string cardId = gained["id"];
-                            string cardName = cardId.substr(5);
-                            transform(cardName.begin(), cardName.end(), cardName.begin(), ::tolower);
+                            string cardName = stripId(gained["id"]);
 
                             if (cardMap.count(cardName))
                             {
@@ -165,14 +253,16 @@ int main(int argc, char* argv[])
                     {
                         for (auto& rc : playerStat["relic_choices"])
                         {
-                            string relicId = rc["choice"];
-                            string relicName = relicId.substr(6);
-                            transform(relicName.begin(), relicName.end(), relicName.begin(), ::tolower);
+                            string relicName = stripId(rc["choice"]);
 
                             bool wasPicked = rc["was_picked"];
 
                             if (relicMap.count(relicName))
                             {
+                                if (playerIndex == 0)
+                                    relicChoicesCsv << runIdStr << "," << floorNumber << ","
+                                        << relicName << "," << (wasPicked ? "true" : "false") << "\n";
+
                                 relicMap[relicName].timesSeen++;
                                 if (wasPicked)
                                 {
@@ -201,7 +291,13 @@ int main(int argc, char* argv[])
                             if (characterNames.count(relicName)) continue; // starter relic upgrade choice, not a relic
 
                             if (relicMap.count(relicName))
+                            {
+                                if (playerIndex == 0)
+                                    relicChoicesCsv << runIdStr << "," << floorNumber << ","
+                                        << relicName << ",false\n";
+
                                 relicMap[relicName].timesSeen++;
+                            }
                             else
                                 cout << "UNMATCHED RELIC (ancient): " << relicName << "\n";
                         }
@@ -216,14 +312,15 @@ int main(int argc, char* argv[])
                         room["room_type"] != "elite" &&
                         room["room_type"] != "boss") continue;
 
-                    string encounterId = room["model_id"];
-                    encounterId = encounterId.substr(10);
-                    transform(encounterId.begin(), encounterId.end(), encounterId.begin(), ::tolower);
+                    string encounterId = stripId(room["model_id"]);
 
                     int turnsTaken = room["turns_taken"];
 
                     if (monsterMap.count(encounterId))
                     {
+                        combatsCsv << runIdStr << "," << floorNumber << ","
+                            << encounterId << "," << turnsTaken << "\n";
+
                         monsterMap[encounterId].timesSeen++;
                         monsterMap[encounterId].totalTurnsTaken += turnsTaken;
                     }
@@ -247,11 +344,32 @@ int main(int argc, char* argv[])
         string killedBy = run["killed_by_encounter"];
         if (killedBy != "NONE.NONE")
         {
-            killedBy = killedBy.substr(10);
-            transform(killedBy.begin(), killedBy.end(), killedBy.begin(), ::tolower);
+            killedBy = stripId(killedBy);
             if (monsterMap.count(killedBy))
                 monsterMap[killedBy].timesKilledPlayer++;
         }
+    }
+
+    {
+        ofstream csv("output/raw/cards.csv");
+        csv << "card_name,card_class,card_rarity,card_type\n";
+        for (const auto& [name, card] : cardMap)
+            csv << name << "," << card.cardClass << "," << card.cardRarity << ","
+                << card.cardType << "\n";
+    }
+
+    {
+        ofstream csv("output/raw/relics.csv");
+        csv << "relic_name,relic_rarity\n";
+        for (const auto& [name, relic] : relicMap)
+            csv << name << "," << relic.relicRarity << "\n";
+    }
+
+    {
+        ofstream csv("output/raw/encounters.csv");
+        csv << "encounter_name,act,difficulty\n";
+        for (const auto& [name, encounter] : monsterMap)
+            csv << name << "," << encounter.act << "," << encounter.difficulty << "\n";
     }
 
     cout << "\nProcessed " << filesProcessed << " run file(s)." << "\n";
@@ -296,7 +414,7 @@ int main(int argc, char* argv[])
 
     size_t overallLabelLen = max(maxCharLen, string("Overall").size());
 
-    cout << "\n========== Character Statistics ==========" << "\n";
+    cout << "\n========== Character Statistics ==========\n";
     for (auto& [name, stats] : playedCharacters)
     {
         cout << "  " << left << setw(overallLabelLen) << formatName(name) << right
@@ -330,7 +448,7 @@ int main(int argc, char* argv[])
     for (auto& [name, _] : earnedBadges)
         maxBadgeLen = max(maxBadgeLen, formatName(name).size());
 
-    cout << "\n========== Badge Statistics ==========" << "\n";
+    cout << "\n========== Badge Statistics ==========\n";
     for (auto& [name, stats] : earnedBadges)
     {
         cout << "  " << left << setw(maxBadgeLen) << formatName(name) << right
@@ -372,7 +490,7 @@ int main(int argc, char* argv[])
         maxRelicLen = max(maxRelicLen, formatName(name).size());
 
     string currentRelicRarity = "NONE";
-    cout << "\n========== Relic Statistics ==========" << "\n";
+    cout << "\n========== Relic Statistics ==========\n";
     for (auto& [name, stats] : seenRelics)
     {
         if (stats->relicRarity != currentRelicRarity)
@@ -439,7 +557,7 @@ int main(int argc, char* argv[])
 
     string currentClass = "NONE";
     string currentRarity = "NONE";
-    cout << "\n========== Card Statistics ==========" << "\n";
+    cout << "\n========== Card Statistics ==========\n";
     for (auto& [name, stats] : seenCards)
     {
         if (stats->cardClass != currentClass)
@@ -503,7 +621,7 @@ int main(int argc, char* argv[])
 
     string currentAct = "NONE";
     string currentDifficulty = "NONE";
-    cout << "\n========== Monster Statistics ==========" << "\n";
+    cout << "\n========== Monster Statistics ==========\n";
     for (auto& [name, stats] : seenMonsters)
     {
         if (stats->act != currentAct)

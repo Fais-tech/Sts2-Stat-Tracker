@@ -8,3 +8,6 @@ history/
 
 # Generated CSV output
 output/
+sts_tracker
+.run
+C:*
