@@ -1,6 +1,6 @@
 # Sts2-Stat-Tracker
 
-A C++ command-line tool that parses run history files from **Slay the Spire 2** and generates detailed statistics across characters, cards, relics, badges, and enemy encounters.
+A C++ command-line tool that parses run history files from **Slay the Spire 2**, generates statistics across characters, cards, relics, badges, and enemy encounters, and exports a **normalized PostgreSQL database** for SQL analysis.
 
 ## Features
 
@@ -9,6 +9,7 @@ A C++ command-line tool that parses run history files from **Slay the Spire 2** 
 - **Relic Statistics** — pick rate and win rate for every relic, grouped by rarity
 - **Badge Statistics** — bronze, silver, and gold counts for all earned badges
 - **Encounter Statistics** — average damage taken, average turns, and kill count per enemy encounter, grouped by act and difficulty
+- **PostgreSQL export** — 9-table normalized schema (~56,000 rows from 530 runs) with showcase analytical queries
 
 ## How to Build
 
@@ -30,43 +31,70 @@ Place your `.run` history files in a folder and run:
 ./sts_tracker /path/to/your/history
 ```
 
-The `.run` files are JSON run exports from Slay the Spire 2. The program will process all `.run` files it finds and print a formatted statistics report to the terminal.
+The program prints a statistics report, writes summary CSVs to `output/`, and writes normalized, one-row-per-event CSVs to `output/raw/`.
 
-## Sample Output
+## Database
+
+### Why normalize?
+
+The original program aggregated everything in C++ (effectively a hand-written `SUM ... GROUP BY`), so the summary CSVs couldn't be joined or re-sliced. The raw export instead records **one row per event** — every card offered, every floor, every fight — and lets SQL do the aggregation. The original summary CSVs are kept as an answer key to validate the SQL results.
+
+### Schema
 
 ```
-Processed 97 run file(s).
-
-========== Character Statistics ==========
-  Ironclad    | Runs:  23 | Wins:   8 | Win Rate:  34.78% | Abandoned:   2
-  Silent      | Runs:  18 | Wins:   5 | Win Rate:  27.78% | Abandoned:   1
-  ...
-  Overall     | Runs:  97 | Wins:  30 | Win Rate:  30.93% | Abandoned:   7
-
-========== Card Statistics ==========
-
-=== Ironclad ===
-
-  -- Common --
-  Anger        | Pick Rate:  42.10% | Picked:  8/ 19 | Win Rate:  37.50% | Wins:   3
-  ...
+            cards           relics          encounters        (lookup tables, from the C++ headers)
+              ▲               ▲              ▲      ▲
+              │               │              │      │
+        card_choices    relic_choices     combats   │
+              │               │              │      │
+              └───────┬───────┘              │      │
+                      ▼                      ▼      │
+                    floors ◄─────────────────┘      │
+                      │                             │
+                      ▼                             │
+   badges_earned ──► runs ──── killed_by_encounter ─┘
 ```
 
-## Objective
+| Table | Grain (one row per…) | Primary key |
+|---|---|---|
+| `runs` | run | `run_id` (unix timestamp from the filename) |
+| `floors` | map point visited | `(run_id, floor_number)` |
+| `combats` | fight (subtype of `floors`) | `(run_id, floor_number)` — also the FK to `floors` |
+| `card_choices` | card offered | `choice_id` (serial) |
+| `relic_choices` | relic offered | `choice_id` (serial) |
+| `badges_earned` | badge earned in a run | `(run_id, badge_name)` |
+| `cards`, `relics`, `encounters` | game entity | name |
 
-This project was built to demonstrate practical C++ concepts applied to real data processing:
+Design notes:
+- **Lookup vs. event tables** — facts that depend only on a card/relic/encounter (rarity, act, difficulty) live once in a lookup table; event tables reference them by foreign key.
+- **Subtype table** — combat-only columns (`encounter_name`, `turns_taken`) live in `combats` rather than as mostly-NULL columns on `floors`.
+- **Run-wide floor numbers** — floors count 1…N across the whole run, so `(run_id, floor_number)` is unique without a third key column.
+- **NULLs** — `killed_by_encounter` / `killed_by_event` are NULL when not applicable (empty CSV fields load as NULL).
+- **Abandoned runs** are excluded from most win-rate queries; runs quit at the opening event would otherwise count as losses.
 
-- **STL Containers** — `unordered_map` for O(1) average-case stat lookups across 500+ cards, relics, and encounters; `vector` for dynamic sorted output lists
-- **Structs and Inheritance** — base structs (`Card`, `Relic`, `Encounter`) are extended via inheritance into statistics structs that add tracking fields and computed methods
-- **File I/O and Filesystem** — uses `std::filesystem` to iterate a directory and `std::ifstream` to batch-read JSON run files
-- **JSON Parsing** — integrates the `nlohmann/json` library to deserialize structured game data from raw files
-- **Sorting with Lambdas** — `std::sort` with custom lambda comparators to order output by class, rarity, act, and difficulty
-- **String Manipulation** — `std::transform` and `substr` to normalize game IDs into display-friendly names
-- **Formatted Output** — `std::iomanip` (`setw`, `setprecision`, `fixed`) to align tabular statistics output in the terminal
-- **Header Guards** — all headers use `#ifndef`/`#define`/`#endif` to prevent duplicate inclusion
+### Load it
+
+Requires PostgreSQL with `psql` on your PATH.
+
+```bash
+./sts_tracker          # writes output/raw/*.csv
+./load_db.sh           # creates database "sts2", builds tables, loads CSVs
+psql -d sts2 -f sql/queries.sql
+```
+
+### Example queries (`sql/queries.sql`)
+
+1. Win rate by character, with an overall row (`GROUP BY ROLLUP`, `FILTER`)
+2. Win rate by ascension level
+3. Top 3 deadliest encounters per act (`RANK() OVER (PARTITION BY …)`)
+4. Hardest fights by average damage taken (3-table join)
+5. Card pick rate and win rate — reproduces the C++ program's numbers in SQL
+6. Cards that most improve win rate vs. the character's baseline (CTEs)
+7. Average HP by floor, winning vs. losing runs
+8. Running total of wins over time (window function)
 
 ## Technologies
 
-- **C++17** — structured bindings, `std::filesystem`, `if constexpr`
-- **STL** — `unordered_map`, `vector`, `algorithm`, `iomanip`
+- **C++17** — structured bindings, `std::filesystem`, STL containers, lambdas
 - **[nlohmann/json](https://github.com/nlohmann/json)** — JSON parsing
+- **PostgreSQL** — normalized schema, foreign keys, composite keys, check constraints, indexes, CTEs, window functions
